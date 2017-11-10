@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
   build-essential \
   flex \
   gfortran \
+  ghostscript \
   git \
   g++ \
   libtool \
@@ -23,15 +24,23 @@ RUN wget -O boost_1_61_0.tar.bz2 https://sourceforge.net/projects/boost/files/bo
   && rm boost_1_61_0.tar.bz2 \
   && cd boost_1_61_0 \
   && ./bootstrap.sh --with-libraries=chrono,date_time,filesystem,iostreams,program_options,random,regex,serialization,signals,system,thread,wave \
-  && ./b2 -sNO_BZIP2=1 install
+  && ./b2 -j $(nproc) -sNO_BZIP2=1 install
 
-RUN wget https://github.com/rose-compiler/rose/archive/v0.9.9.0.tar.gz \
-  && tar xf v0.9.9.0.tar.gz \
-  && rm v0.9.9.0.tar.gz
+# download rose
+RUN git clone https://github.com/rose-compiler/rose
 
-ENV ROSESRC=$WORKSPACE/rose-0.9.9.0
-ENV ROSEBLD=$WORKSPACE/build
+ENV ROSESRC=/srv/rose
+ENV ROSEBLD=/srv/build
 ENV BOOSTROOT=/usr/local
 ENV LD_LIBRARY_PATH="$BOOSTROOT/lib:$LD_LIBRARY_PATH" 
 
+WORKDIR $ROSESRC
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN ./build
+
 WORKDIR $ROSEBLD
+
+RUN $ROSESRC/configure --prefix=/usr/local --enable-languages=c,c++ --with-boost=$BOOSTROOT
+RUN make -j $(nproc)
+RUN make install
