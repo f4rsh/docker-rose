@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /srv
+ENV WORKSPACE=/srv
+WORKDIR $WORKSPACE
 
 # install boost
 RUN wget -O boost_1_61_0.tar.bz2 https://sourceforge.net/projects/boost/files/boost/1.61.0/boost_1_61_0.tar.bz2/download \
@@ -24,23 +25,23 @@ RUN wget -O boost_1_61_0.tar.bz2 https://sourceforge.net/projects/boost/files/bo
   && rm boost_1_61_0.tar.bz2 \
   && cd boost_1_61_0 \
   && ./bootstrap.sh --with-libraries=chrono,date_time,filesystem,iostreams,program_options,random,regex,serialization,signals,system,thread,wave \
-  && ./b2 -j $(nproc) -sNO_BZIP2=1 install
+  && ./b2 -j $(nproc) -sNO_BZIP2=1 install \
+  && rm -rf $WORKSPACE
 
-# download rose
-RUN git clone https://github.com/rose-compiler/rose
-
-ENV ROSESRC=/srv/rose
-ENV ROSEBLD=/srv/build
+ENV ROSESRC=$WORKSPACE/rose
+ENV ROSEBLD=$WORKSPACE/build
 ENV BOOSTROOT=/usr/local
 ENV LD_LIBRARY_PATH="$BOOSTROOT/lib:$LD_LIBRARY_PATH" 
 
-WORKDIR $ROSESRC
-
-RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN ./build
-
-WORKDIR $ROSEBLD
-
-RUN $ROSESRC/configure --prefix=/usr/local --enable-languages=c,c++ --with-boost=$BOOSTROOT
-RUN make -j $(nproc)
-RUN make install
+# pre-install rose
+RUN git clone https://github.com/rose-compiler/rose $ROSESRC \
+  && ln -s /usr/bin/python3 /usr/bin/python \
+  && cd $ROSESRC \
+  && ./build \
+# cd ROSEBLD dir
+  && mkdir $ROSEBLD \
+  && cd $ROSEBLD \
+  && $ROSESRC/configure --prefix=/usr/local --enable-languages=c,c++ --with-boost=$BOOSTROOT \
+  && make -j $(nproc) \
+  && make install \
+  && rm -rf $WORKSPACE
